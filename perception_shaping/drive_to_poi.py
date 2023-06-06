@@ -21,7 +21,7 @@ class Driver(Node):
         # Subscriber for laser scans
         self.scan_subscriber = self.create_subscription(
             LaserScan, 
-            '/clean_scan',
+            '/shaped_scan',
             self.scan_callback,
             10)
         self.scan_subscriber # prevent unused variable warning
@@ -35,7 +35,7 @@ class Driver(Node):
 
     def scan_callback(self, scan_msg):
         # pass
-        self.get_logger().info('Msg recieved')
+        # self.get_logger().info('Msg recieved')
 
         # Create velocity command for robot
         twist_msg = Twist()
@@ -49,7 +49,7 @@ class Driver(Node):
         # The poi distance from the lidar
         poi_distance = scan_msg.ranges[np.argmin(scan_msg.ranges)]
 
-        self.get_logger().info("distance: %s"%poi_distance)
+        # self.get_logger().info("distance: %s"%poi_distance)
         if poi_distance <= self.dist_threshold:
             linear_vel = 0.
         else:
@@ -57,21 +57,21 @@ class Driver(Node):
         return linear_vel
 
     def calculate_turn(self, scan_msg: LaserScan):
-        self.get_logger().info("calculate_turn()")
+        # self.get_logger().info("calculate_turn()")
         # The index of the poi in the lidar scan is the nearest range
         poi_ind = float(np.argmin(scan_msg.ranges))
-        self.get_logger().info("poi_ind: %s"%poi_ind)
+        # self.get_logger().info("poi_ind: %s"%poi_ind)
 
         # Move poi_ind from [0,360] frame to [-180,180] frame
         poi_ind_adjusted = poi_ind - 180
-        self.get_logger().info("poi_ind_adjusted: %s"%poi_ind_adjusted)
+        # self.get_logger().info("poi_ind_adjusted: %s"%poi_ind_adjusted)
         
         # Calculate angle difference (degrees)
         if poi_ind_adjusted >= 0:
             angle_diff = poi_ind_adjusted-180
         else:
             angle_diff = 180+poi_ind_adjusted
-        self.get_logger().info("angle_diff: %s"%angle_diff)
+        # self.get_logger().info("angle_diff: %s"%angle_diff)
         
         # Threshold (degrees) for when the robot can stop the turn and just drive straight
         diff_threshold = 2
@@ -90,7 +90,7 @@ class Driver(Node):
             elif turn_rad < -self.max_angular_z:
                 turn_rad = - self.max_angular_z
 
-        self.get_logger().info('Angular z: %s' % turn_rad)
+        # self.get_logger().info('Angular z: %s' % turn_rad)
         return turn_rad
 
 def main(args=None):

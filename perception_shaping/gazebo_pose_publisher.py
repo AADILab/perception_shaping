@@ -33,7 +33,7 @@ class GazeboPosePublisher(Node):
                 has_turtlebot_pose = True
                 turtlebot_transform = transform
                 break
-        
+
         # Take the pose and repackage it into an odometry message
         if has_turtlebot_pose:
             # Create odometry message. Populate it with the header and child frame information
