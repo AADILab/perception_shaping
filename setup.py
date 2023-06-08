@@ -27,7 +27,7 @@ setup(
             'driver = perception_shaping.drive_to_poi:main',
             'scan_cleaner = perception_shaping.clean_scan:main',
             'gazebo_pose_publisher = perception_shaping.gazebo_pose_publisher:main',
-            'supervisor = perception_shaping.supervisor:main'
+            'supervisor = perception_shaping.supervisor_node:main'
         ],
     },
 )

@@ -50,11 +50,12 @@ class Driver(Node):
         poi_distance = scan_msg.ranges[np.argmin(scan_msg.ranges)]
 
         # self.get_logger().info("distance: %s"%poi_distance)
-        if poi_distance <= self.dist_threshold:
-            linear_vel = 0.
-        else:
-            linear_vel = 0.1
-        return linear_vel
+        # if poi_distance <= self.dist_threshold:
+        #     linear_vel = 0.
+        # else:
+        #     linear_vel = 0.1
+        # return linear_vel
+        return 0.1
 
     def calculate_turn(self, scan_msg: LaserScan):
         # self.get_logger().info("calculate_turn()")
