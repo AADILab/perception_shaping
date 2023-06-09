@@ -21,10 +21,13 @@ from sensor_msgs.msg import LaserScan
 import numpy as np
 from scipy.spatial.transform import Rotation
 
+import yaml
+
 # Useful standard libraries
 from copy import deepcopy
 from typing import Optional
 import pickle
+import os
 
 class Supervisor:
     def __init__(self, n_inp=9, n_out=360, n_hid=30):
@@ -155,6 +158,22 @@ class SupervisorNode(Node):
         else:
             self.supervisor = None
 
+        self.save_trajectory = False
+        self.path_name = "/root/foxy_ws/src/perception_shaping/logs/log.yaml"
+        self.log_file = open(self.path_name, 'w')
+        self.log_counter = 0
+
+        self.xs = []
+        self.ys = []
+        self.thetas = []
+        self.ts = []
+        self.log_data = {
+            "xs": self.xs,
+            "ys": self.ys,
+            "thetas": self.thetas,
+            "ts": self.ts
+        }
+
     def load_network(self, policy_filename):
         sp = Supervisor()
         with open(policy_filename, 'rb') as weights_file:
@@ -186,15 +205,23 @@ class SupervisorNode(Node):
     def aggregate_supervisor_input(self):
         # Get the turtlebot pose as x,y,theta
         turtlebot_x, turtlebot_y, turtlebot_angle = self.extract_2d_pose(self.turtlebot_pose_msg)
-        # self.get_logger().info("%s %s %s"%(turtlebot_x, turtlebot_y, turtlebot_angle))
-        # self.get_logger().info("{:.2} {:.2} {:.3}".format(turtlebot_x, turtlebot_y, turtlebot_angle))
+        self.get_logger().info("%s %s %s"%(turtlebot_x, turtlebot_y, turtlebot_angle))
+        self.get_logger().info("{:.2} {:.2} {:.3}".format(turtlebot_x, turtlebot_y, turtlebot_angle))
 
         # Get the poi position and hazzard position
         poi_x, poi_y = POI_POSITION
         hazzard_x, hazzard_y = HAZZARD_POSITION
 
         # Put it all together
-        return np.array([turtlebot_x, turtlebot_y, turtlebot_angle, poi_x, poi_y, hazzard_x, hazzard_y])
+        # Convert turtlebot angle from radians to degrees for feeding into the supervisor, which is trained on degrees
+        turtlebot_angle_degrees = turtlebot_angle*57.2958
+        # Adjust the degrees so that we have degrees mapping from [-180,180] instead of [0,360]
+        if turtlebot_angle_degrees < 180: turtlebot_angle_degrees += 360
+        turtlebot_angle_degrees -= 360
+
+        supervisor_input = np.array([turtlebot_x, turtlebot_y, turtlebot_angle_degrees, poi_x, poi_y, hazzard_x, hazzard_y])
+        self.get_logger().info(f"supervisor_input: {list(supervisor_input)}")
+        return supervisor_input
 
     def compute_counterfactual(self, supervisor_input):
         # Computes the counterfactual lidar scan that we add to the actual scan to get the shaped scan
@@ -209,6 +236,7 @@ class SupervisorNode(Node):
         else:
             # Then we actually run the network
             counterfactual = self.supervisor.run_supervisor_nn(turtlebot=supervisor_input[0:3], target=list(supervisor_input[3:5])+[POI_RADIUS], hazard=list(supervisor_input[5:7])+[HAZZARD_RADIUS])
+            self.get_logger().info(f"counterfactual: {list(counterfactual)}")
             return list(counterfactual)
     
     def timer_callback(self):
@@ -217,7 +245,7 @@ class SupervisorNode(Node):
 
         # Don't run this if necessary messages have not been received
         if self.turtlebot_pose_msg is None or self.clean_scan_msg is None:
-            self.get_logger().info("Waiting for pose and scan messages.")
+            # self.get_logger().info("Waiting for pose and scan messages.")
             return None
 
         # Aggregate messages and information into supervisor input
@@ -233,11 +261,8 @@ class SupervisorNode(Node):
 
         shaped_scan = [0.1 if shaped_range < 0 else shaped_range for shaped_range in shaped_scan]
 
-        argmin_cf = np.argmin(counterfactual_scan)
-        argmin_sh = np.argmin(shaped_scan)
-        self.get_logger().info(f"Counterfactual: {counterfactual_scan[argmin_cf]}")
-        self.get_logger().info(f"Shaped scan: {shaped_scan[argmin_sh]}")
-        self.get_logger().info(f"Shaped scan: {shaped_scan}")
+        # self.get_logger().info(f"clean_scan: {actual_scan}")
+        # self.get_logger().info(f"shaped_scan: {shaped_scan}")
 
         # Pack shaped scan into a message
         shaped_scan_msg = deepcopy(self.clean_scan_msg)
@@ -245,6 +270,17 @@ class SupervisorNode(Node):
 
         # Publish the shaped scan
         self.shaped_scan_publisher.publish(shaped_scan_msg)
+
+        if self.save_trajectory:
+            # Record the pose of the robot at this timestep
+            self.xs.append(float(supervisor_input[0]))
+            self.ys.append(float(supervisor_input[1]))
+            self.thetas.append(float(supervisor_input[2]))
+            # self.ts.append(self.get_clock().now())
+            # os.remove(self.path_name)
+            with open(self.path_name+str(self.log_counter)+".yaml", 'w') as self.log_file:
+                yaml.dump(self.log_data, self.log_file, default_flow_style=False)
+            self.log_counter+=1
 
 def main(args=None):
     rclpy.init(args=args)

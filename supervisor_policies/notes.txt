@@ -1,1 +1,3 @@
 policy_000.pkl is the first policy we're putting here from Nick's turtlebot simulator repo. The original name was SupervisorNN
+policy_001.pkl is a policy that I trained with a really informative fitness signal that is the inverse distance from the poi. Or the fitness is -10 if the hazard was hit
+

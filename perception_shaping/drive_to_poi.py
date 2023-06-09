@@ -33,6 +33,9 @@ class Driver(Node):
         self.angle_threshold = 5 # degrees
         self.dist_threshold = 0.5 # m
 
+        # Switch for stopping when near the POI vs driving forward
+        self.stop_at_poi = False
+
     def scan_callback(self, scan_msg):
         # pass
         # self.get_logger().info('Msg recieved')
@@ -40,22 +43,26 @@ class Driver(Node):
         # Create velocity command for robot
         twist_msg = Twist()
         twist_msg.angular.z = self.calculate_turn(scan_msg)
-        twist_msg.linear.x = self.calculate_linear(scan_msg, twist_msg.angular.z)
+        twist_msg.linear.x = self.calculate_linear(scan_msg)
+
+        # self.get_logger().info(f"angular: {twist_msg.angular.z} | linear: {twist_msg.linear.x}")
 
         # Send velocity command to robot
         self.vel_publisher.publish(twist_msg)
 
-    def calculate_linear(self, scan_msg: LaserScan, turn_rad):
-        # The poi distance from the lidar
-        poi_distance = scan_msg.ranges[np.argmin(scan_msg.ranges)]
+    def calculate_linear(self, scan_msg: LaserScan):
+        if self.stop_at_poi:
+            # The poi distance from the lidar
+            poi_distance = scan_msg.ranges[np.argmin(scan_msg.ranges)]
 
-        # self.get_logger().info("distance: %s"%poi_distance)
-        # if poi_distance <= self.dist_threshold:
-        #     linear_vel = 0.
-        # else:
-        #     linear_vel = 0.1
-        # return linear_vel
-        return 0.1
+            # self.get_logger().info("distance: %s"%poi_distance)
+            if poi_distance <= self.dist_threshold:
+                linear_vel = 0.
+            else:
+                linear_vel = 0.1
+            return linear_vel
+        else:
+            return 0.1
 
     def calculate_turn(self, scan_msg: LaserScan):
         # self.get_logger().info("calculate_turn()")
